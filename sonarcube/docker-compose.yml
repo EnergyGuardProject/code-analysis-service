@@ -1,6 +1,7 @@
 services:
   sonarqube:
     image: sonarqube:10.5-community  # pin version for stability
+    restart: always
     container_name: sonarqube
     ports:
       - "9000:9000"
