@@ -1,0 +1,389 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Processing Analysis - Code Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'analysis_ui/css/mockup1.css' %}">
+  <link rel="stylesheet" href="{% static 'analysis_ui/css/processing.css' %}">
+</head>
+<body>
+  <main class="app-layout">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand-wrap">
+        <a href="https://energy-guard.eu/" target="_blank" rel="noopener noreferrer">
+          <img src="{% static 'analysis_ui/images/eguard-logo.png' %}" alt="EnergyGuard">
+        </a>
+      </div>
+
+      <nav class="side-nav">
+        <a href="#" class="nav-link"><span class="dot"></span>Home</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Dashboard</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Projects</a>
+
+        <div class="nav-group is-open" data-nav-group>
+          <button type="button" class="nav-link nav-toggle" data-nav-toggle aria-expanded="true">
+            <span class="dot"></span>Trustworthiness Benchmarks
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="sub-nav" data-nav-menu>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>AI ACT Questionnaire</a>
+            <a href="{% url 'analysis_ui:select_source' %}" class="nav-link nav-sublink is-active"><span class="dot"></span>Code Analysis</a>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>ALTAI Self - Assessment</a>
+          </div>
+        </div>
+
+        <a href="#" class="nav-link"><span class="dot"></span>Assets</a>
+        <a href="#" class="nav-link"><span class="dot"></span>HPC Provision</a>
+      </nav>
+    </aside>
+
+    <section class="page-shell">
+      <section class="panel">
+        <ol class="stepper" aria-label="Analysis workflow steps">
+          <li class="step is-complete">
+            <a class="step-link" href="{% url 'analysis_ui:select_source' %}">
+              <span class="bubble">1</span>
+              <span class="label">Select Source</span>
+            </a>
+          </li>
+          <li class="step is-complete">
+            {% if configure_step_url_name %}
+            <a class="step-link" href="{% url configure_step_url_name %}">
+              <span class="bubble">2</span>
+              <span class="label">Configure Source</span>
+            </a>
+            {% else %}
+            <span class="bubble">2</span>
+            <span class="label">Configure Source</span>
+            {% endif %}
+          </li>
+          <li class="step is-current">
+            <span class="bubble">3</span>
+            <span class="label">Analyze</span>
+          </li>
+          <li class="step">
+            <span class="bubble">4</span>
+            <span class="label">Results</span>
+          </li>
+        </ol>
+
+        <header class="hero processing-hero">
+          {% if analysis_error %}
+            <div class="processing-badge processing-badge--error">
+              <span class="processing-badge-dot"></span>
+              Backend Error
+            </div>
+            <h1>Analysis could not be completed</h1>
+            <p>The backend returned an error while processing <strong>{{ source_label }}</strong>.</p>
+          {% elif analysis_result %}
+            <div class="processing-badge processing-badge--complete">
+              <span class="processing-badge-dot"></span>
+              Analysis Complete
+            </div>
+            <h1>Analysis finished for {{ analysis_result.project_name }}</h1>
+            <p>The latest scan completed successfully for <strong>{{ source_label }}</strong> and the summary is shown below.</p>
+          {% else %}
+            <div class="processing-badge">
+              <span class="processing-badge-dot"></span>
+              Analysis Running
+            </div>
+            <h1>Processing your code analysis</h1>
+            <p>We are preparing the analysis pipeline for <strong>{{ source_label }}</strong> and scanning the submitted codebase.</p>
+          {% endif %}
+        </header>
+
+        <section class="config-wrap processing-wrap">
+          {% if analysis_error %}
+            <div class="processing-grid">
+              <section class="processing-card processing-card--primary">
+                <div class="result-banner result-banner--error">The scan request did not complete successfully.</div>
+                <p class="progress-caption">{{ analysis_error }}</p>
+              </section>
+
+              <aside class="processing-sidebar">
+                <section class="processing-card processing-card--meta">
+                  <h2>Submission summary</h2>
+                  <dl class="summary-list">
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{{ source_label }}</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>Failed</dd>
+                    </div>
+                    <div>
+                      <dt>Backend</dt>
+                      <dd>sonar-api</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <div class="processing-actions">
+                  <a class="btn btn-ghost" href="{% url 'analysis_ui:select_source' %}">Back to sources</a>
+                </div>
+              </aside>
+            </div>
+          {% elif analysis_result %}
+            <div class="processing-grid">
+              <section class="processing-card processing-card--primary">
+                <div class="progress-head">
+                  <div>
+                    <span class="progress-kicker">Analysis summary</span>
+                    <h2>{{ analysis_result.project_name }}</h2>
+                  </div>
+                  <div class="progress-percent">100%</div>
+                </div>
+
+                <div class="result-metrics">
+                  <article class="metric-card">
+                    <span class="metric-label">Issues</span>
+                    <strong>{{ issues_count }}</strong>
+                  </article>
+                  <article class="metric-card">
+                    <span class="metric-label">Bugs</span>
+                    <strong>{{ metrics_summary.bugs }}</strong>
+                  </article>
+                  <article class="metric-card">
+                    <span class="metric-label">Vulnerabilities</span>
+                    <strong>{{ metrics_summary.vulnerabilities }}</strong>
+                  </article>
+                  <article class="metric-card">
+                    <span class="metric-label">Code Smells</span>
+                    <strong>{{ metrics_summary.code_smells }}</strong>
+                  </article>
+                  <article class="metric-card">
+                    <span class="metric-label">Coverage</span>
+                    <strong>{{ metrics_summary.coverage }}%</strong>
+                  </article>
+                </div>
+
+                <div class="result-output">
+                  <h3>Scanner output</h3>
+                  <pre>{{ analysis_result.scan_output }}</pre>
+                </div>
+              </section>
+
+              <aside class="processing-sidebar">
+                <section class="processing-card processing-card--meta">
+                  <h2>Submission summary</h2>
+                  <dl class="summary-list">
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{{ source_label }}</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>Completed</dd>
+                    </div>
+                    <div>
+                      <dt>Project key</dt>
+                      <dd>{{ analysis_result.project_key }}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section class="processing-card processing-card--log">
+                  <div class="log-head">
+                    <h2>Detected findings</h2>
+                    <span class="log-chip">top {{ issues_preview|length }}</span>
+                  </div>
+                  <ul class="log-list">
+                    {% for issue in issues_preview %}
+                      <li>{{ issue.display_message|default:issue.message|default:issue.rule }} on {{ issue.component|default:issue.path }}</li>
+                    {% empty %}
+                      <li>No issues were returned in the scan preview.</li>
+                    {% endfor %}
+                  </ul>
+                </section>
+
+                <div class="processing-actions">
+                  <a class="btn btn-ghost" href="{% url 'analysis_ui:select_source' %}">Back to sources</a>
+                </div>
+              </aside>
+            </div>
+          {% else %}
+            <div class="processing-grid">
+              <section class="processing-card processing-card--primary">
+                <div class="progress-head">
+                  <div>
+                    <span class="progress-kicker">Current job</span>
+                    <h2>Trustworthiness benchmark scan</h2>
+                  </div>
+                  <div class="progress-percent" id="progress-percent">12%</div>
+                </div>
+
+                <div class="progress-bar" aria-hidden="true">
+                  <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+
+                <p class="progress-caption" id="progress-caption">Preparing analysis workspace and validating submitted input.</p>
+
+                <ol class="stage-list" id="stage-list">
+                  <li class="stage-item is-active">
+                    <span class="stage-dot"></span>
+                    <div>
+                      <strong>Initialize environment</strong>
+                      <span>Set up analysis runtime and normalize source input.</span>
+                    </div>
+                  </li>
+                  <li class="stage-item">
+                    <span class="stage-dot"></span>
+                    <div>
+                      <strong>Extract code structure</strong>
+                      <span>Resolve folders, detect languages, and map package layout.</span>
+                    </div>
+                  </li>
+                  <li class="stage-item">
+                    <span class="stage-dot"></span>
+                    <div>
+                      <strong>Run benchmark checks</strong>
+                      <span>Execute static checks and trustworthiness benchmark rules.</span>
+                    </div>
+                  </li>
+                  <li class="stage-item">
+                    <span class="stage-dot"></span>
+                    <div>
+                      <strong>Compile report</strong>
+                      <span>Assemble findings, metrics, and recommendations.</span>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+
+              <aside class="processing-sidebar">
+                <section class="processing-card processing-card--meta">
+                  <h2>Submission summary</h2>
+                  <dl class="summary-list">
+                    <div>
+                      <dt>Source</dt>
+                      <dd>{{ source_label }}</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd id="summary-status">{% if job_status == 'running' %}Running{% else %}Queued and starting{% endif %}</dd>
+                    </div>
+                    <div>
+                      <dt>Estimated time</dt>
+                      <dd>2-4 minutes</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <div class="processing-actions">
+                  <a class="btn btn-ghost" href="{% url 'analysis_ui:select_source' %}">Back to sources</a>
+                  <button class="btn btn-primary" type="button" disabled>Results will appear here next</button>
+                </div>
+              </aside>
+            </div>
+          {% endif %}
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const groups = document.querySelectorAll('[data-nav-group]');
+      groups.forEach((group) => {
+        const toggle = group.querySelector('[data-nav-toggle]');
+        if (!toggle) return;
+        toggle.addEventListener('click', () => {
+          const open = group.classList.toggle('is-open');
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      });
+
+      {% if not analysis_result and not analysis_error %}
+      const steps = [
+        {
+          percent: 18,
+          caption: 'Preparing analysis workspace and validating submitted input.',
+          status: 'Initializing environment',
+          log: 'Environment bootstrapped for the submitted source.'
+        },
+        {
+          percent: 42,
+          caption: 'Inspecting repository structure, dependencies, and entry points.',
+          status: 'Extracting code structure',
+          log: 'Folder structure mapped and primary languages detected.'
+        },
+        {
+          percent: 73,
+          caption: 'Running code quality and trustworthiness benchmark checks.',
+          status: 'Executing benchmark checks',
+          log: 'Static analysis and benchmark rules are running.'
+        },
+        {
+          percent: 92,
+          caption: 'Waiting for the backend to finish and publish the analysis report.',
+          status: 'Finalizing analysis',
+          log: 'Backend scan is wrapping up and results will open automatically.'
+        }
+      ];
+
+      const progressPercent = document.getElementById('progress-percent');
+      const progressBarFill = document.getElementById('progress-bar-fill');
+      const progressCaption = document.getElementById('progress-caption');
+      const summaryStatus = document.getElementById('summary-status');
+      const stageItems = Array.from(document.querySelectorAll('.stage-item'));
+      const logList = document.getElementById('log-list');
+
+      function renderStep(index) {
+        const step = steps[index];
+        if (!step) return;
+
+        progressPercent.textContent = step.percent + '%';
+        progressBarFill.style.width = step.percent + '%';
+        progressCaption.textContent = step.caption;
+        summaryStatus.textContent = step.status;
+
+        stageItems.forEach((item, itemIndex) => {
+          item.classList.toggle('is-complete', itemIndex < index);
+          item.classList.toggle('is-active', itemIndex === index);
+        });
+
+        if (logList) {
+          const entry = document.createElement('li');
+          entry.textContent = step.log;
+          logList.appendChild(entry);
+          while (logList.children.length > 5) {
+            logList.removeChild(logList.firstChild);
+          }
+        }
+      }
+
+      renderStep(0);
+      steps.slice(1).forEach((_, index) => {
+        window.setTimeout(() => renderStep(index + 1), (index + 1) * 1600);
+      });
+
+      {% if job_id and job_status == 'running' %}
+      // Poll the status API frequently and redirect as soon as the job finishes.
+      (function poll() {
+        window.setTimeout(function () {
+          fetch('/processing/status/?job={{ job_id }}')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.status === 'completed') {
+                window.location.href = '/results/{{ job_id }}/';
+              } else if (data.status === 'failed' || data.status === 'not_found') {
+                window.location.reload();
+              } else {
+                poll();
+              }
+            })
+            .catch(function () { poll(); });
+        }, 1500);
+      })();
+      {% endif %}
+      {% endif %}
+    })();
+  </script>
+</body>
+</html>

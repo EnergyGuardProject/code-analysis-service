@@ -1,0 +1,116 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Analysis - Select Source</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'analysis_ui/css/mockup1.css' %}">
+</head>
+<body>
+  <main class="app-layout">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand-wrap">
+        <a href="https://energy-guard.eu/" target="_blank" rel="noopener noreferrer">
+          <img src="{% static 'analysis_ui/images/eguard-logo.png' %}" alt="EnergyGuard">
+        </a>
+      </div>
+
+      <nav class="side-nav">
+        <a href="#" class="nav-link"><span class="dot"></span>Home</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Dashboard</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Projects</a>
+
+        <div class="nav-group is-open" data-nav-group>
+          <button type="button" class="nav-link nav-toggle" data-nav-toggle aria-expanded="true">
+            <span class="dot"></span>Trustworthiness Benchmarks
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="sub-nav" data-nav-menu>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>AI ACT Questionnaire</a>
+            <a href="{% url 'analysis_ui:select_source' %}" class="nav-link nav-sublink is-active"><span class="dot"></span>Code Analysis</a>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>ALTAI Self - Assessment</a>
+          </div>
+        </div>
+
+        <a href="#" class="nav-link"><span class="dot"></span>Assets</a>
+        <a href="#" class="nav-link"><span class="dot"></span>HPC Provision</a>
+      </nav>
+    </aside>
+
+    <section class="page-shell">
+      <section class="panel">
+        <ol class="stepper" aria-label="Analysis workflow steps">
+          <li class="step is-complete">
+            <span class="bubble">1</span>
+            <span class="label">Select Source</span>
+          </li>
+          <li class="step">
+            <span class="bubble">2</span>
+            <span class="label">Configure Source</span>
+          </li>
+          <li class="step">
+            <span class="bubble">3</span>
+            <span class="label">Analyze</span>
+          </li>
+          <li class="step">
+            <span class="bubble">4</span>
+            <span class="label">Results</span>
+          </li>
+        </ol>
+
+        <header class="hero">
+          <h1>Select the source of your code</h1>
+          <p>Choose how you want to provide the code for analysis.</p>
+        </header>
+
+        <section class="cards" aria-label="Source selection options">
+          <div class="source-link source-link--disabled" aria-disabled="true" title="Coming soon">
+            <article class="source-card source-card--disabled">
+              <img class="card-image" src="{% static 'analysis_ui/images/source-jupyter.svg' %}" alt="JupyterHub Workspace">
+              <h2>JupyterHub Workspace</h2>
+              <p>Analyze code directly from your JupyterHub environment.</p>
+              <footer>Coming soon</footer>
+            </article>
+          </div>
+
+          <a class="source-link" href="{% url 'analysis_ui:configure_github' %}">
+            <article class="source-card">
+              <img class="card-image" src="{% static 'analysis_ui/images/source-github.svg' %}" alt="GitHub Repository">
+              <h2>GitHub Repository</h2>
+              <p>Provide a GitHub repository URL to analyze its source code.</p>
+              <footer>Public repositories only</footer>
+            </article>
+          </a>
+
+          <a class="source-link" href="{% url 'analysis_ui:configure_upload' %}">
+            <article class="source-card">
+              <img class="card-image" src="{% static 'analysis_ui/images/source-upload.svg' %}" alt="Upload ZIP File">
+              <h2>Upload ZIP File</h2>
+              <p>Upload a compressed archive containing your source code.</p>
+              <footer>Max size 500 MB, supports .zip and .tar.gz</footer>
+            </article>
+          </a>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const groups = document.querySelectorAll('[data-nav-group]');
+      groups.forEach((group) => {
+        const toggle = group.querySelector('[data-nav-toggle]');
+        if (!toggle) return;
+        toggle.addEventListener('click', () => {
+          const open = group.classList.toggle('is-open');
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

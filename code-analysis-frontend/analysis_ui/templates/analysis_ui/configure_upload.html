@@ -1,0 +1,229 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configure Local ZIP Source - Code Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'analysis_ui/css/mockup1.css' %}">
+  <link rel="stylesheet" href="{% static 'analysis_ui/css/configure_upload.css' %}">
+</head>
+<body>
+  <main class="app-layout">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand-wrap">
+        <a href="https://energy-guard.eu/" target="_blank" rel="noopener noreferrer">
+          <img src="{% static 'analysis_ui/images/eguard-logo.png' %}" alt="EnergyGuard">
+        </a>
+      </div>
+
+      <nav class="side-nav">
+        <a href="#" class="nav-link"><span class="dot"></span>Home</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Dashboard</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Projects</a>
+
+        <div class="nav-group is-open" data-nav-group>
+          <button type="button" class="nav-link nav-toggle" data-nav-toggle aria-expanded="true">
+            <span class="dot"></span>Trustworthiness Benchmarks
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="sub-nav" data-nav-menu>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>AI ACT Questionnaire</a>
+            <a href="{% url 'analysis_ui:select_source' %}" class="nav-link nav-sublink is-active"><span class="dot"></span>Code Analysis</a>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>ALTAI Self - Assessment</a>
+          </div>
+        </div>
+
+        <a href="#" class="nav-link"><span class="dot"></span>Assets</a>
+        <a href="#" class="nav-link"><span class="dot"></span>HPC Provision</a>
+      </nav>
+    </aside>
+
+    <section class="page-shell">
+      <section class="panel">
+        <ol class="stepper" aria-label="Analysis workflow steps">
+          <li class="step is-complete">
+            <a class="step-link" href="{% url 'analysis_ui:select_source' %}">
+              <span class="bubble">1</span>
+              <span class="label">Select Source</span>
+            </a>
+          </li>
+          <li class="step is-current">
+            <span class="bubble">2</span>
+            <span class="label">Configure Source</span>
+          </li>
+          <li class="step">
+            <span class="bubble">3</span>
+            <span class="label">Analyze</span>
+          </li>
+          <li class="step">
+            <span class="bubble">4</span>
+            <span class="label">Results</span>
+          </li>
+        </ol>
+
+        <header class="hero zip-hero">
+          <div class="zip-hero-icon" aria-hidden="true">
+            <img src="{% static 'analysis_ui/images/source-upload.svg' %}" alt="">
+          </div>
+          <h1>Configure Local ZIP Source</h1>
+          <p>Upload a compressed archive from your machine and choose how the analysis should interpret its contents.</p>
+        </header>
+
+        <section class="config-wrap zip-config-wrap">
+          <form class="zip-form" action="{% url 'analysis_ui:processing' %}" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="source_type" value="Local ZIP File">
+
+            <div class="zip-grid">
+              <section class="zip-panel zip-panel--primary">
+                <h2 class="zip-section-title">Upload archive</h2>
+
+                <label class="zip-dropzone" for="archive-file" id="zip-dropzone">
+                  <input id="archive-file" name="archive_file" type="file" accept=".zip,.tar.gz,.tgz,.gz" hidden>
+                  <span class="zip-dropzone-icon" aria-hidden="true">
+                    <img src="{% static 'analysis_ui/images/source-upload.svg' %}" alt="">
+                  </span>
+                  <span class="zip-dropzone-title">Drag and drop your archive here</span>
+                  <span class="zip-dropzone-copy">or click to browse your local files</span>
+                  <span class="zip-file-pill" id="zip-file-pill">No file selected</span>
+                </label>
+
+                <div class="zip-chip-row" aria-label="Supported archive types">
+                  <span class="zip-chip">.zip</span>
+                  <span class="zip-chip">.tar.gz</span>
+                  <span class="zip-chip">.tgz</span>
+                  <span class="zip-chip">Max 500 MB</span>
+                </div>
+
+                <div class="zip-field-row">
+                  <div class="zip-field">
+                    <label class="zip-label" for="analysis-name">Analysis name</label>
+                    <input id="analysis-name" name="analysis_name" class="zip-input" type="text" placeholder="Local repo intake - March 2026">
+                  </div>
+
+                  <div class="zip-field">
+                    <label class="zip-label" for="root-folder">Root folder inside archive</label>
+                    <input id="root-folder" name="root_folder" class="zip-input" type="text" placeholder="project/src">
+                  </div>
+                </div>
+
+                <div class="zip-field">
+                  <label class="zip-label" for="notes">Notes</label>
+                  <textarea id="notes" name="notes" class="zip-textarea" rows="4" placeholder="Optional context such as repository snapshot, internal build number, or expected entry point."></textarea>
+                </div>
+              </section>
+
+              <aside class="zip-panel zip-panel--secondary">
+                <h2 class="zip-section-title">Archive requirements</h2>
+
+                <ul class="zip-checklist">
+                  <li>Include the full source tree you want analyzed.</li>
+                  <li>Avoid password-protected or encrypted archives.</li>
+                  <li>Keep large generated outputs and virtual environments out of the package.</li>
+                  <li>Place the main project files under a single top-level folder when possible.</li>
+                </ul>
+
+                <div class="zip-summary-card">
+                  <span class="zip-summary-label">Selected archive</span>
+                  <strong class="zip-summary-name" id="zip-summary-name">Waiting for file selection</strong>
+                  <span class="zip-summary-meta" id="zip-summary-meta">Choose a local archive to continue</span>
+                </div>
+              </aside>
+            </div>
+
+            <div class="zip-actions">
+              <a class="btn btn-ghost" href="{% url 'analysis_ui:select_source' %}">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M10.5 12.5 6 8l4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Back
+              </a>
+              <button class="btn btn-primary" type="submit">
+                Upload and Continue
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M5.5 3.5 10 8l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const groups = document.querySelectorAll('[data-nav-group]');
+      groups.forEach((group) => {
+        const toggle = group.querySelector('[data-nav-toggle]');
+        if (!toggle) return;
+        toggle.addEventListener('click', () => {
+          const open = group.classList.toggle('is-open');
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      });
+
+      const fileInput = document.getElementById('archive-file');
+      const dropzone = document.getElementById('zip-dropzone');
+      const pill = document.getElementById('zip-file-pill');
+      const summaryName = document.getElementById('zip-summary-name');
+      const summaryMeta = document.getElementById('zip-summary-meta');
+
+      function formatSize(bytes) {
+        if (!bytes && bytes !== 0) return '';
+        if (bytes < 1024 * 1024) {
+          return Math.round(bytes / 1024) + ' KB';
+        }
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      }
+
+      function updateFileState(file) {
+        if (!file) {
+          pill.textContent = 'No file selected';
+          summaryName.textContent = 'Waiting for file selection';
+          summaryMeta.textContent = 'Choose a local archive to continue';
+          return;
+        }
+
+        pill.textContent = file.name;
+        summaryName.textContent = file.name;
+        summaryMeta.textContent = formatSize(file.size) + ' • ' + (file.type || 'Archive file');
+      }
+
+      if (fileInput) {
+        fileInput.addEventListener('change', () => {
+          const file = fileInput.files && fileInput.files[0];
+          updateFileState(file);
+        });
+      }
+
+      if (dropzone && fileInput) {
+        ['dragenter', 'dragover'].forEach((eventName) => {
+          dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            dropzone.classList.add('is-dragover');
+          });
+        });
+
+        ['dragleave', 'drop'].forEach((eventName) => {
+          dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            dropzone.classList.remove('is-dragover');
+          });
+        });
+
+        dropzone.addEventListener('drop', (event) => {
+          const files = event.dataTransfer && event.dataTransfer.files;
+          if (!files || !files.length) return;
+          fileInput.files = files;
+          updateFileState(files[0]);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

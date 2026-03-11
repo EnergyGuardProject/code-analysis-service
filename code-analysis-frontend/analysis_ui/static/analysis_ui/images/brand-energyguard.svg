@@ -1,0 +1,6 @@
+<svg width="180" height="40" viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M7 6h8l5 7 5-7h8l-8 11 8 11h-8l-5-7-5 7H7l8-11L7 6z" fill="#55A9F8"/>
+  <path d="M12 6h5l5 7 5-7h5l-8 11 8 11h-5l-5-7-5 7h-5l8-11-8-11z" fill="#8A7AF4" opacity=".7"/>
+  <text x="40" y="25" fill="#8090A8" font-size="28" font-family="Manrope, sans-serif" font-weight="700">Energy</text>
+  <text x="130" y="25" fill="#4AB0F7" font-size="28" font-family="Manrope, sans-serif" font-weight="700">Guard</text>
+</svg>

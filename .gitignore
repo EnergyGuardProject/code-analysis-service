@@ -6,3 +6,7 @@
 **/.scannerwork
 **/curl-test.sh
 **/example-python
+**/example-python
+**/code-analysis-venv
+**/backup
+**/analysis_reports/

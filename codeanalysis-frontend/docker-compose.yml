@@ -1,0 +1,16 @@
+name: codeanalysis-frontend
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codeanalysis-frontend
+    ports:
+      - "9002:9002"
+    environment:
+      - SCAN_API_URL=${SCAN_API_URL:-http://host.docker.internal:9001}
+      - SCAN_API_TIMEOUT=${SCAN_API_TIMEOUT:-300}
+    volumes:
+      - .:/app
+    command: python manage.py runserver 0.0.0.0:9002

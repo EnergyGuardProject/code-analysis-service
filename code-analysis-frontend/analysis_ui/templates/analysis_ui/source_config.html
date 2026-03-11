@@ -1,0 +1,106 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }} - Code Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'analysis_ui/css/mockup1.css' %}">
+</head>
+<body>
+  <main class="app-layout">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand-wrap">
+        <a href="https://energy-guard.eu/" target="_blank" rel="noopener noreferrer">
+          <img src="{% static 'analysis_ui/images/eguard-logo.png' %}" alt="EnergyGuard">
+        </a>
+      </div>
+
+      <nav class="side-nav">
+        <a href="#" class="nav-link"><span class="dot"></span>Home</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Dashboard</a>
+        <a href="#" class="nav-link"><span class="dot"></span>Projects</a>
+
+        <div class="nav-group is-open" data-nav-group>
+          <button type="button" class="nav-link nav-toggle" data-nav-toggle aria-expanded="true">
+            <span class="dot"></span>Trustworthiness Benchmarks
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="sub-nav" data-nav-menu>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>AI ACT Questionnaire</a>
+            <a href="{% url 'analysis_ui:select_source' %}" class="nav-link nav-sublink is-active"><span class="dot"></span>Code Analysis</a>
+            <a href="#" class="nav-link nav-sublink"><span class="dot"></span>ALTAI Self - Assessment</a>
+          </div>
+        </div>
+
+        <a href="#" class="nav-link"><span class="dot"></span>Assets</a>
+        <a href="#" class="nav-link"><span class="dot"></span>HPC Provision</a>
+      </nav>
+    </aside>
+
+    <section class="page-shell">
+      <section class="panel">
+        <ol class="stepper" aria-label="Analysis workflow steps">
+          <li class="step is-complete">
+            <a class="step-link" href="{% url 'analysis_ui:select_source' %}">
+              <span class="bubble">1</span>
+              <span class="label">Select Source</span>
+            </a>
+          </li>
+          <li class="step is-current">
+            <span class="bubble">2</span>
+            <span class="label">Configure Source</span>
+          </li>
+          <li class="step">
+            <span class="bubble">3</span>
+            <span class="label">Analyze</span>
+          </li>
+          <li class="step">
+            <span class="bubble">4</span>
+            <span class="label">Results</span>
+          </li>
+        </ol>
+
+        <header class="hero">
+          <h1>{{ page_title }}</h1>
+          <p>{{ page_subtitle }}</p>
+        </header>
+
+        <section class="config-wrap">
+          <form class="config-form" action="{% url 'analysis_ui:processing' %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="source_type" value="{{ source_type|default:page_title }}">
+            <label for="primary-input">{{ primary_label }}</label>
+            <input id="primary-input" name="primary_input" type="text" placeholder="{{ primary_placeholder }}">
+
+            <label for="secondary-input">{{ secondary_label }}</label>
+            <input id="secondary-input" name="secondary_input" type="text" placeholder="{{ secondary_placeholder }}">
+
+            <div class="form-actions">
+              <a class="btn btn-ghost" href="{% url 'analysis_ui:select_source' %}">Back</a>
+              <button class="btn btn-primary" type="submit">{{ submit_label }}</button>
+            </div>
+          </form>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const groups = document.querySelectorAll('[data-nav-group]');
+      groups.forEach((group) => {
+        const toggle = group.querySelector('[data-nav-toggle]');
+        if (!toggle) return;
+        toggle.addEventListener('click', () => {
+          const open = group.classList.toggle('is-open');
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
