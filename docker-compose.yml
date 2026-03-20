@@ -1,0 +1,30 @@
+version: "3.8"
+
+networks:
+  code-analysis-net:
+    driver: bridge
+
+services:
+  backend:
+    build: ./code-analysis-backend
+    container_name: code_analysis_backend
+    ports:
+      - "9001:5000"
+    networks:
+      - code-analysis-net
+
+  frontend:
+    build: ./code-analysis-frontend
+    container_name: code-analysis-frontend
+    ports:
+      - "9002:9002"
+    environment:
+      - SCAN_API_URL=http://code_analysis_backend:5000
+      - SCAN_API_TIMEOUT=${SCAN_API_TIMEOUT:-300}
+    volumes:
+      - ./code-analysis-frontend:/app
+    command: python manage.py runserver 0.0.0.0:9002
+    depends_on:
+      - backend
+    networks:
+      - code-analysis-net
