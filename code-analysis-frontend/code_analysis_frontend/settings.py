@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-0(km3^wh-y)7+z-#hu!y&9y_sxs3c3p01ag*+2hg1pijzk2uwn
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['energyguard.epu.ntua.gr', 'localhost', '127.0.0.1']
 
 
 # Application definition
