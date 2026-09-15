@@ -8,6 +8,7 @@ services:
   backend:
     build: ./code-analysis-backend
     container_name: code_analysis_backend
+    restart: always
     ports:
       - "9001:5000"
     networks:
@@ -16,6 +17,7 @@ services:
   frontend:
     build: ./code-analysis-frontend
     container_name: code-analysis-frontend
+    restart: always
     ports:
       - "9002:9002"
     environment:
