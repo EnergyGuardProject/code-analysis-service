@@ -24,6 +24,8 @@ SEMGREP_OSS_CONFIGS = [
 
 app = FastAPI(title="Code Analysis Backend")
 
+NOTEBOOK_CHECKPOINTS_DIR = ".ipynb_checkpoints"
+
 # ------------------------------
 # HELPERS
 # ------------------------------
@@ -60,7 +62,11 @@ def _normalize_issue_location(issue_path: str, source_root: str | None = None) -
     return raw
 
 
-def extract_semgrep_taxonomy(semgrep_json_path: str, source_root: str | None = None) -> dict:
+def extract_semgrep_taxonomy(
+    semgrep_json_path: str,
+    source_root: str | None = None,
+    notebook_maps: dict[str, list[tuple[int, int]]] | None = None,
+) -> dict:
     """Extract CWE/CVE references directly from raw Semgrep JSON metadata."""
     if not os.path.exists(semgrep_json_path):
         return {
@@ -75,6 +81,7 @@ def extract_semgrep_taxonomy(semgrep_json_path: str, source_root: str | None = N
     with open(semgrep_json_path, "r") as f:
         semgrep_data = json.load(f)
 
+    notebook_maps = notebook_maps or {}
     cwe_ids = set()
     cve_ids = set()
     standard_rows = []
@@ -84,7 +91,7 @@ def extract_semgrep_taxonomy(semgrep_json_path: str, source_root: str | None = N
     results = semgrep_data.get("results", [])
     scanned_files = semgrep_data.get("paths", {}).get("scanned", [])
     normalized_scanned_files = [
-        _normalize_issue_location(path, source_root)
+        _resolve_notebook_location(_normalize_issue_location(path, source_root), None, notebook_maps)[0]
         for path in scanned_files
         if str(path or "").strip()
     ]
@@ -216,12 +223,18 @@ def extract_semgrep_taxonomy(semgrep_json_path: str, source_root: str | None = N
                 metadata_rows.append({"key": label, "value": value})
         metadata_rows.sort(key=lambda item: item["key"])
 
+        location, line = _resolve_notebook_location(
+            _normalize_issue_location(issue.get("path") or "unknown", source_root),
+            issue.get("start", {}).get("line"),
+            notebook_maps,
+        )
+
         incidents.append(
             {
                 "rule": rule_id or "semgrep",
                 "message": message or title,
-                "location": _normalize_issue_location(issue.get("path") or "unknown", source_root),
-                "line": issue.get("start", {}).get("line"),
+                "location": location,
+                "line": line,
                 "severity": issue_severity,
                 "status": "OPEN",
                 "effort": "n/a",
@@ -330,8 +343,136 @@ def resolve_source_path(workspace: str, subdirectory: str | None = None) -> str:
     return str(source_path)
 
 
+_NOTEBOOK_LANGUAGE_EXTENSIONS = {
+    "python": ".py",
+    "r": ".r",
+    "julia": ".jl",
+    "scala": ".scala",
+    "javascript": ".js",
+    "typescript": ".ts",
+    "ruby": ".rb",
+    "go": ".go",
+    "java": ".java",
+    "c++": ".cpp",
+    "c": ".c",
+    "csharp": ".cs",
+    "php": ".php",
+    "bash": ".sh",
+    "shell": ".sh",
+}
+
+
+def _notebook_cell_source(cell: dict) -> str:
+    source = cell.get("source", "")
+    if isinstance(source, list):
+        source = "".join(source)
+    return source
+
+
+def _notebook_language_and_extension(notebook: dict) -> tuple[str, str]:
+    """Infer a notebook's kernel language and a matching file extension from its
+    metadata (language_info / kernelspec), defaulting to Python when absent."""
+    metadata = notebook.get("metadata", {}) or {}
+    language_info = metadata.get("language_info", {}) or {}
+    kernelspec = metadata.get("kernelspec", {}) or {}
+
+    language = str(language_info.get("name") or kernelspec.get("language") or "python").lower()
+
+    extension = language_info.get("file_extension") or _NOTEBOOK_LANGUAGE_EXTENSIONS.get(language, f".{language}")
+    if not extension.startswith("."):
+        extension = f".{extension}"
+
+    return language, extension
+
+
+def _sanitize_magic_lines(text: str) -> str:
+    """Comment out IPython line/cell magics and shell escapes (e.g. `%matplotlib
+    inline`, `!pip install ...`) so the rest of the cell stays valid Python for
+    Semgrep's parser. IPython-only convention - never applied to other kernels,
+    where a leading `%`/`!` can be legitimate syntax (e.g. R's `%>%` pipe)."""
+    lines = text.split("\n")
+    return "\n".join(
+        f"# {line}" if line.lstrip().startswith(("%", "!")) else line
+        for line in lines
+    )
+
+
+def _notebook_to_source(notebook_path: Path) -> tuple[str, list[tuple[int, int]], str]:
+    """Flatten a notebook's code cells into an equivalent source string in its
+    kernel's language.
+
+    Returns the generated source, a line_map where line_map[i] gives the
+    (cell_index, line_within_cell) that produced generated line i + 1 (so a
+    Semgrep finding on the generated file can be traced back to its notebook
+    cell), and the file extension to write it with.
+    """
+    with open(notebook_path, "r", encoding="utf-8") as f:
+        notebook = json.load(f)
+
+    language, extension = _notebook_language_and_extension(notebook)
+    sanitize = _sanitize_magic_lines if language == "python" else (lambda text: text)
+
+    py_lines: list[str] = []
+    line_map: list[tuple[int, int]] = []
+
+    for cell_index, cell in enumerate(notebook.get("cells", [])):
+        if cell.get("cell_type") != "code":
+            continue
+        source = sanitize(_notebook_cell_source(cell))
+        if not source.strip():
+            continue
+        for local_line, line in enumerate(source.split("\n"), start=1):
+            py_lines.append(line)
+            line_map.append((cell_index, local_line))
+        py_lines.append("")
+        line_map.append((cell_index, 0))
+
+    return "\n".join(py_lines), line_map, extension
+
+
+def convert_notebooks_to_source_files(workspace: str) -> dict[str, list[tuple[int, int]]]:
+    """Write a source-code sibling for every notebook in workspace, in its own
+    kernel language, so Semgrep - which has no native .ipynb support - picks up
+    and scans their code cells.
+
+    Returns a map of generated-file path (relative to workspace) -> line_map, used
+    afterwards to translate findings back to notebook cell/line references.
+    """
+    notebook_maps: dict[str, list[tuple[int, int]]] = {}
+    for notebook_path in Path(workspace).rglob("*.ipynb"):
+        if NOTEBOOK_CHECKPOINTS_DIR in notebook_path.parts:
+            continue
+        try:
+            source, line_map, extension = _notebook_to_source(notebook_path)
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"Skipping unreadable notebook {notebook_path}: {exc}")
+            continue
+
+        generated_path = notebook_path.with_name(notebook_path.name + extension)
+        generated_path.write_text(source, encoding="utf-8")
+        notebook_maps[str(generated_path.relative_to(workspace))] = line_map
+
+    return notebook_maps
+
+
+def _resolve_notebook_location(location: str, line: int | None, notebook_maps: dict) -> tuple[str, int | None]:
+    """Translate a finding on a generated `<name>.ipynb<ext>` file back to its
+    source notebook and the line within that cell."""
+    path = Path(location)
+    if not path.stem.endswith(".ipynb") or location not in notebook_maps:
+        return location, line
+
+    original = str(path.with_suffix(""))
+    line_map = notebook_maps[location]
+    if line and 1 <= line <= len(line_map):
+        cell_index, cell_line = line_map[line - 1]
+        return f"{original} (cell {cell_index + 1})", cell_line or None
+    return original, None
+
+
 def run_semgrep(source_path: str) -> dict:
     """Run Semgrep on source_path and return the taxonomy dict."""
+    notebook_maps = convert_notebooks_to_source_files(source_path)
     semgrep_json = os.path.join(source_path, "semgrep.json")
     result = subprocess.run(
         build_semgrep_command(source_path, semgrep_json),
@@ -340,7 +481,7 @@ def run_semgrep(source_path: str) -> dict:
     )
     if result.returncode != 0:
         print(f"Semgrep warning: {result.stderr}")
-    return extract_semgrep_taxonomy(semgrep_json, source_path)
+    return extract_semgrep_taxonomy(semgrep_json, source_path, notebook_maps)
 
 
 # ------------------------------
