@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+rules:
+- id: custom_js_browser-storage-token
+  languages:
+  - javascript
+  - typescript
+  severity: INFO
+  message: |
+    An access token, API key or secret is written to the browser storage (`localStorage` or `sessionStorage`).
+    Scripts on the page can read it, so a single cross-site scripting (XSS) flaw lets an attacker steal the session.
+
+    Consider keeping the token in an `HttpOnly`, `Secure` cookie set by the server, and keep tokens short-lived.
+  metadata:
+    cwe: "CWE-922"
+    category: "security"
+    shortDescription: "Insecure storage of sensitive information"
+    owasp:
+    - "A02:2021-Cryptographic Failures"
+    security-severity: "Low"
+    confidence: "MEDIUM"
+    references:
+    - "https://cwe.mitre.org/data/definitions/922.html"
+  patterns:
+  - pattern-either:
+    - pattern: localStorage.setItem($K, <... $V ...>)
+    - pattern: sessionStorage.setItem($K, <... $V ...>)
+    - pattern: window.localStorage.setItem($K, <... $V ...>)
+    - pattern: window.sessionStorage.setItem($K, <... $V ...>)
+  - metavariable-regex:
+      metavariable: $V
+      regex: (?i)^(.*[._])?(access_?token|auth_?token|id_?token|refresh_?token|jwt|api_?key|secret|token)$

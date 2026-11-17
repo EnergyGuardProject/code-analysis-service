@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+rules:
+- id: custom_python_cors-wildcard-credentials
+  languages:
+  - python
+  severity: ERROR
+  message: |
+    The API allows requests from any website (`*`) and also allows credentials (cookies, authorization headers).
+    With this combination (the FastAPI/Starlette middleware then echoes back the caller's origin), any page a user
+    visits can call this API as that user from their browser and read the answers.
+
+    To remediate this issue, list the exact origins that need access (your own front-end URLs) instead of `*`.
+  metadata:
+    cwe: "CWE-942"
+    category: "security"
+    shortDescription: "Overly permissive cross-domain whitelist"
+    owasp:
+    - "A05:2021-Security Misconfiguration"
+    security-severity: "High"
+    confidence: "HIGH"
+    references:
+    - "https://cwe.mitre.org/data/definitions/942.html"
+  patterns:
+  - pattern-either:
+    - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origins=["*"], ..., allow_credentials=True, ...)
+    - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_credentials=True, ..., allow_origins=["*"], ...)
+    - patterns:
+      - pattern-either:
+        - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origins=$O, ..., allow_credentials=True, ...)
+        - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_credentials=True, ..., allow_origins=$O, ...)
+      - pattern-inside: |
+          $O = ["*"]
+          ...
+- id: custom_python_cors-wildcard
+  languages:
+  - python
+  severity: WARNING
+  message: |
+    The API allows requests from any website (`*`). Any page a user visits can call this API from their browser and
+    read the answers (cookies and authorization headers are not sent unless credentials are also allowed).
+
+    To remediate this issue, list the exact origins that need access (your own front-end URLs) instead of `*`.
+  metadata:
+    cwe: "CWE-942"
+    category: "security"
+    shortDescription: "Overly permissive cross-domain whitelist"
+    owasp:
+    - "A05:2021-Security Misconfiguration"
+    security-severity: "Medium"
+    confidence: "HIGH"
+    references:
+    - "https://cwe.mitre.org/data/definitions/942.html"
+  patterns:
+  - pattern-either:
+    - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origins=["*"], ...)
+    - pattern: CORS($APP, ..., origins="*", ...)
+    - pattern: CORS($APP, ..., origins=["*"], ...)
+    - patterns:
+      - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origins=$O, ...)
+      - pattern-inside: |
+          $O = ["*"]
+          ...
+  - pattern-not: $APP.add_middleware(CORSMiddleware, ..., allow_credentials=True, ...)

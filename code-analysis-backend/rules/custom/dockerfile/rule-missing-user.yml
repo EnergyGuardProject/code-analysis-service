@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+rules:
+- id: custom_dockerfile_missing-user
+  languages:
+  - dockerfile
+  severity: WARNING
+  message: |
+    The container runs as `root` because the Dockerfile never sets a `USER`. If an attacker takes over the
+    application, they have full control inside the container and a much easier path to the host.
+
+    To remediate this issue, create an unprivileged user and switch to it before the final command, for example
+    `RUN useradd --create-home app` followed by `USER app`.
+  metadata:
+    cwe: "CWE-250"
+    category: "security"
+    shortDescription: "Execution with unnecessary privileges"
+    owasp:
+    - "A05:2021-Security Misconfiguration"
+    security-severity: "Medium"
+    confidence: "HIGH"
+    references:
+    - "https://cwe.mitre.org/data/definitions/250.html"
+  patterns:
+  - pattern-either:
+    - pattern: CMD ...
+    - pattern: ENTRYPOINT ...
+  - pattern-not-inside: |
+      USER $U
+      ...

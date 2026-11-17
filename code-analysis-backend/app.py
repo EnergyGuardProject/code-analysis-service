@@ -12,15 +12,10 @@ from fastapi.responses import JSONResponse
 # ------------------------------
 # CONFIG
 # ------------------------------
-SEMGREP_OSS_CONFIGS = [
-    "p/bandit",
-    "p/findsecbugs",
-    "p/flawfinder",
-    "p/phpcs-security-audit",
-    "p/security-code-scan",
-    "p/eslint",
-    "p/gitleaks",
-]
+# Rules are vendored in ./rules, under open-source licences compatible with this project's AGPL-3.0-or-later
+# (see rules/NOTICE.md). Do not point Semgrep at registry rule sets ("p/..."): many of those rules are under
+# the Semgrep Rules License, which does not allow offering them to others as a service.
+RULES_DIR = str(Path(__file__).resolve().parent / "rules")
 
 app = FastAPI(title="Code Analysis Backend")
 
@@ -31,9 +26,10 @@ NOTEBOOK_CHECKPOINTS_DIR = ".ipynb_checkpoints"
 # ------------------------------
 
 def build_semgrep_command(source_path: str, output_path: str):
-    cmd = ["semgrep"]
-    for config in SEMGREP_OSS_CONFIGS:
-        cmd.extend(["--config", config])
+    cmd = ["semgrep", "--config", RULES_DIR, "--metrics", "off", "--disable-version-check"]
+    # Raw notebooks are JSON: their code cells are scanned through the source file generated next to them
+    # (see convert_notebooks_to_source_files), which gives a cell number instead of a JSON line.
+    cmd.extend(["--exclude", "*.ipynb"])
     cmd.extend(["--json", "--timeout", "60", source_path, "-o", output_path])
     return cmd
 
@@ -62,6 +58,79 @@ def _normalize_issue_location(issue_path: str, source_root: str | None = None) -
     return raw
 
 
+def _clean_rule_id(check_id: str) -> str:
+    """Semgrep prefixes the id of rules loaded from a folder with their path
+    (`rules.python.assert.<id>`): keep the rule's own id."""
+    check_id = str(check_id or "").strip()
+    if check_id.startswith("rules."):
+        return check_id.rsplit(".", 1)[-1]
+    return check_id
+
+
+def extract_scan_errors(
+    semgrep_data: dict,
+    source_root: str | None = None,
+    notebook_maps: dict[str, list[tuple[int, int]]] | None = None,
+) -> list[dict]:
+    """List the files Semgrep could not (fully) analyze, e.g. because of a syntax
+    error. Semgrep skips such files without failing, so without this a broken file
+    looks the same as a clean one ("0 findings")."""
+    notebook_maps = notebook_maps or {}
+    root_prefix = (source_root.rstrip("/") + "/") if source_root else ""
+    errors = []
+    seen = set()
+
+    for err in semgrep_data.get("errors", []) or []:
+        if not isinstance(err, dict):
+            continue
+
+        err_type = err.get("type")
+        if isinstance(err_type, list):
+            err_type = err_type[0] if err_type else None
+        err_type = str(err_type or "Error")
+
+        raw_path = str(err.get("path") or "").strip()
+        message = " ".join(str(err.get("message") or "").split())
+        if root_prefix:
+            message = message.replace(root_prefix, "")
+
+        # Line in the file Semgrep read (for a notebook: the generated source file).
+        line = None
+        spans = err.get("spans") or []
+        if spans and isinstance(spans[0], dict):
+            line = (spans[0].get("start") or {}).get("line")
+
+        # "<kind> at line <file>:<N>: <detail>" -> keep "<kind>: <detail>"; the location and
+        # line are shown separately (and mapped back to the notebook cell for notebooks).
+        match = re.match(r"^(?P<kind>.+?) at line \S+?:(?P<line>\d+):\s*(?P<detail>.*)$", message)
+        if match:
+            if line is None:
+                line = int(match.group("line"))
+            detail = match.group("detail").strip()
+            message = f"{match.group('kind')}: {detail}" if detail else match.group("kind")
+
+        if raw_path:
+            location, line = _resolve_notebook_location(_normalize_issue_location(raw_path, source_root), line, notebook_maps)
+        else:
+            location = "scan"
+
+        key = (location, line, err_type, message)
+        if key in seen:
+            continue
+        seen.add(key)
+        errors.append(
+            {
+                "location": location,
+                "line": line,
+                "type": err_type,
+                "level": str(err.get("level") or "warn").lower(),
+                "message": message,
+            }
+        )
+
+    return errors
+
+
 def extract_semgrep_taxonomy(
     semgrep_json_path: str,
     source_root: str | None = None,
@@ -75,7 +144,8 @@ def extract_semgrep_taxonomy(
             "standards": [],
             "by_rule": {},
             "incidents": [],
-            "stats": {"files_scanned": 0, "findings_total": 0, "scan_time_sec": 0.0},
+            "scan_errors": [],
+            "stats": {"files_scanned": 0, "findings_total": 0, "files_with_errors": 0, "scan_time_sec": 0.0},
         }
 
     with open(semgrep_json_path, "r") as f:
@@ -109,7 +179,7 @@ def extract_semgrep_taxonomy(
 
         short_desc = str(metadata.get("shortDescription") or "").strip()
         message = str(extra.get("message") or "").strip()
-        title = short_desc or message or str(issue.get("check_id") or "Semgrep finding")
+        title = short_desc or message or _clean_rule_id(issue.get("check_id")) or "Semgrep finding"
         description = message if message and message != title else ""
         severity_raw = str(metadata.get("security-severity") or extra.get("severity") or "INFO").upper()
         if severity_raw in {"CRITICAL", "HIGH", "ERROR"}:
@@ -137,7 +207,7 @@ def extract_semgrep_taxonomy(
 
         blob = " ".join(search_blobs)
 
-        rule_id = str(issue.get("check_id") or "").strip()
+        rule_id = _clean_rule_id(issue.get("check_id"))
         rule_cwe = set()
         rule_cve = set()
         cwe_descriptions = set()
@@ -245,10 +315,13 @@ def extract_semgrep_taxonomy(
             }
         )
 
+    scan_errors = extract_scan_errors(semgrep_data, source_root, notebook_maps)
+
     return {
         "cwe": sorted(cwe_ids),
         "cve": sorted(cve_ids),
         "scanned_files": sorted(set(normalized_scanned_files)),
+        "scan_errors": scan_errors,
         "standards": standard_rows,
         "by_rule": {
             key: {
@@ -262,6 +335,7 @@ def extract_semgrep_taxonomy(
         "stats": {
             "files_scanned": len(scanned_files),
             "findings_total": len(results),
+            "files_with_errors": len({e["location"].split(" (cell ", 1)[0] for e in scan_errors if e["location"] != "scan"}),
             "scan_time_sec": scan_time_sec,
         },
     }
@@ -386,15 +460,29 @@ def _notebook_language_and_extension(notebook: dict) -> tuple[str, str]:
 
 
 def _sanitize_magic_lines(text: str) -> str:
-    """Comment out IPython line/cell magics and shell escapes (e.g. `%matplotlib
-    inline`, `!pip install ...`) so the rest of the cell stays valid Python for
-    Semgrep's parser. IPython-only convention - never applied to other kernels,
+    """Turn IPython line magics and shell escapes into the Python calls IPython
+    itself would run, so the cell stays valid Python for Semgrep's parser and the
+    rules can still see them: `%pip install x` becomes
+    `get_ipython().run_line_magic('pip', 'install x')` and `!ls` becomes
+    `get_ipython().system('ls')`, at the same indentation. A bare comment would
+    leave an empty block (e.g. an `if` whose only statement was a `%pip install`),
+    which is a syntax error that makes Semgrep skip the whole file and report no
+    findings. Cell magics (`%%bash`) are not Python: their first line is replaced
+    by `pass  # ...`. IPython-only convention - never applied to other kernels,
     where a leading `%`/`!` can be legitimate syntax (e.g. R's `%>%` pipe)."""
-    lines = text.split("\n")
-    return "\n".join(
-        f"# {line}" if line.lstrip().startswith(("%", "!")) else line
-        for line in lines
-    )
+    def neutralize(line: str) -> str:
+        stripped = line.lstrip()
+        if not stripped.startswith(("%", "!")):
+            return line
+        indent = line[: len(line) - len(stripped)]
+        if stripped.startswith("%%"):
+            return f"{indent}pass  # {stripped}"
+        if stripped.startswith("%"):
+            name, _, arguments = stripped[1:].partition(" ")
+            return f"{indent}get_ipython().run_line_magic({name!r}, {arguments.strip()!r})"
+        return f"{indent}get_ipython().system({stripped[1:].strip()!r})"
+
+    return "\n".join(neutralize(line) for line in text.split("\n"))
 
 
 def _notebook_to_source(notebook_path: Path) -> tuple[str, list[tuple[int, int]], str]:
@@ -481,6 +569,10 @@ def run_semgrep(source_path: str) -> dict:
     )
     if result.returncode != 0:
         print(f"Semgrep warning: {result.stderr}")
+    if not os.path.exists(semgrep_json):
+        # No output at all means the scan itself failed: report it, never return an empty "clean" result.
+        detail = (result.stderr or "").strip()[-500:] or f"exit code {result.returncode}"
+        raise Exception(f"Semgrep did not produce a report: {detail}")
     return extract_semgrep_taxonomy(semgrep_json, source_path, notebook_maps)
 
 

@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+# Notebook lines such as `%pip install x` or `!pip install x` are seen by this rule as
+# `get_ipython().run_line_magic("pip", "install x")` and `get_ipython().system("pip install x")`: the backend
+# converts notebooks the same way IPython does before scanning them.
+rules:
+- id: custom_python_pip-install-unpinned
+  languages:
+  - python
+  severity: INFO
+  message: |
+    Packages are installed while the code runs, without a pinned version. Each run can pull a different version
+    (or a compromised release), and the same code can behave differently from one day to the next.
+
+    To remediate this issue, pin the versions (`pip install package==1.2.3`) or list them in a requirements file
+    that you install once before running the code.
+  metadata:
+    category: "supply-chain"
+    shortDescription: "Packages installed at run time without a pinned version"
+    security-severity: "Info"
+    confidence: "MEDIUM"
+  patterns:
+  - pattern-either:
+    - patterns:
+      - pattern: get_ipython().run_line_magic("pip", "$ARGS")
+      - metavariable-regex:
+          metavariable: $ARGS
+          regex: ^\s*install\b(?!.*(==|~=|\s-r\s|\s--requirement\b|\s-e\s|\s\.(\s|$)))
+    - patterns:
+      - pattern-either:
+        - pattern: get_ipython().system("$ARGS")
+        - pattern: os.system("$ARGS")
+      - metavariable-regex:
+          metavariable: $ARGS
+          regex: ^\s*(python3?\s+-m\s+)?pip3?\s+install\b(?!.*(==|~=|\s-r\s|\s--requirement\b|\s-e\s|\s\.(\s|$)))

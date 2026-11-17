@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+rules:
+- id: custom_python_warnings-ignore-all
+  languages:
+  - python
+  severity: INFO
+  message: |
+    All Python warnings are switched off. Deprecation notices, numerical problems and misuse of a library are
+    reported as warnings, so hiding all of them also hides the early signs of bugs and of code that will break
+    after an upgrade.
+
+    To remediate this issue, ignore only what you have checked: pass the warning `category` (and `module` or
+    `message`) to `warnings.filterwarnings`, or use `warnings.catch_warnings()` around the one call that is noisy.
+  metadata:
+    category: "maintainability"
+    shortDescription: "All warnings are silenced"
+    security-severity: "Info"
+    confidence: "HIGH"
+  pattern-either:
+  - pattern: warnings.filterwarnings("ignore")
+  - pattern: warnings.simplefilter("ignore")

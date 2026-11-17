@@ -64,6 +64,22 @@
               </div>
             </header>
 
+            {% if scan_errors_count %}
+              <section class="scan-warning" role="alert">
+                <strong>Incomplete analysis: {{ scan_errors_count }} problem{{ scan_errors_count|pluralize }} while scanning.</strong>
+                <p>Semgrep could not fully analyze the files below, so they were skipped or only partly checked. The findings shown here may be incomplete, and "0 findings" does not mean these files are clean. Fix the problem and run the analysis again.</p>
+                <ul>
+                  {% for err in scan_errors %}
+                    <li>
+                      <span class="scan-warning-where">{{ err.location }}{% if err.line %} (line {{ err.line }}){% endif %}</span>
+                      <span class="scan-warning-what">{{ err.message|default:err.type }}</span>
+                    </li>
+                  {% endfor %}
+                  {% if scan_errors_hidden %}<li>and {{ scan_errors_hidden }} more (see the downloaded JSON).</li>{% endif %}
+                </ul>
+              </section>
+            {% endif %}
+
             <div class="results-tabs" role="tablist" aria-label="Results views">
               <button class="results-tab is-active" type="button" role="tab" aria-selected="true" data-tab-target="overview">Overview</button>
               <button class="results-tab" type="button" role="tab" aria-selected="false" data-tab-target="details">Details</button>
@@ -86,6 +102,7 @@
                         <tr><td>Source</td><td>{{ source_label }}</td></tr>
                         <tr><td>Total findings</td><td>{{ semgrep_stats.findings_total }}</td></tr>
                         <tr><td>Files scanned</td><td>{{ semgrep_stats.files_scanned }}</td></tr>
+                        {% if semgrep_stats.files_with_errors %}<tr><td>Files not fully analyzed</td><td>{{ semgrep_stats.files_with_errors }}</td></tr>{% endif %}
                         <tr><td>Scan time (sec)</td><td>{{ semgrep_stats.scan_time_sec }}</td></tr>
                         <tr><td>Unique CWE IDs</td><td>{{ semgrep_stats.cwe_total }}</td></tr>
                         <tr><td>Unique CVE IDs</td><td>{{ semgrep_stats.cve_total }}</td></tr>

@@ -209,6 +209,10 @@ def _build_results_context(analysis_result, source_label, job_id):
 	semgrep_incidents = taxonomy_payload.get("incidents", []) if isinstance(taxonomy_payload, dict) else []
 	scanned_files = taxonomy_payload.get("scanned_files", []) if isinstance(taxonomy_payload, dict) else []
 	semgrep_stats = taxonomy_payload.get("stats", {}) if isinstance(taxonomy_payload, dict) else {}
+	scan_errors = [
+		item for item in (taxonomy_payload.get("scan_errors", []) if isinstance(taxonomy_payload, dict) else [])
+		if isinstance(item, dict)
+	]
 	taxonomy_by_rule = taxonomy_payload.get("by_rule", {}) if isinstance(taxonomy_payload, dict) else {}
 	cwe_desc_by_id = {}
 	if isinstance(taxonomy_payload, dict):
@@ -415,6 +419,8 @@ def _build_results_context(analysis_result, source_label, job_id):
 			continue
 		location = str(issue.get("location") or "Unknown file")
 		file_label = location.split(" (line ", 1)[0]
+		# Notebook findings are located as "<name>.ipynb (cell N)": group them under the notebook file.
+		file_label = re.sub(r" \(cell \d+\)$", "", file_label)
 		if ":" in file_label and not file_label.startswith(("./", "/")):
 			file_label = file_label.split(":", 1)[1]
 		# Restrict hotspots to files known to be scanned in the current run.
@@ -515,7 +521,11 @@ def _build_results_context(analysis_result, source_label, job_id):
 			"scan_time_sec": semgrep_stats.get("scan_time_sec", 0.0),
 			"cwe_total": len(cwe_ids),
 			"cve_total": len(cve_ids),
+			"files_with_errors": semgrep_stats.get("files_with_errors", 0),
 		},
+		"scan_errors": scan_errors[:8],
+		"scan_errors_hidden": max(0, len(scan_errors) - 8),
+		"scan_errors_count": len(scan_errors),
 		"metrics_summary": {
 			"bugs": "-",
 			"vulnerabilities": "-",

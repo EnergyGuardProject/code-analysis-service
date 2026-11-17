@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+rules:
+- id: custom_js_cors-wildcard
+  languages:
+  - javascript
+  - typescript
+  severity: WARNING
+  message: |
+    The server allows requests from any website (`Access-Control-Allow-Origin: *`). Any page a user visits can
+    then call this API from their browser and read the answers.
+
+    To remediate this issue, list the exact origins that need access (your own front-end URLs) instead of `*`.
+  metadata:
+    cwe: "CWE-942"
+    category: "security"
+    shortDescription: "Overly permissive cross-domain whitelist"
+    owasp:
+    - "A05:2021-Security Misconfiguration"
+    security-severity: "Medium"
+    confidence: "HIGH"
+    references:
+    - "https://cwe.mitre.org/data/definitions/942.html"
+  pattern-either:
+  - pattern: 'cors({..., origin: "*", ...})'
+  - pattern: '$RES.setHeader("Access-Control-Allow-Origin", "*")'
+  - pattern: '$RES.header("Access-Control-Allow-Origin", "*")'
+  - pattern: '$RES.set("Access-Control-Allow-Origin", "*")'

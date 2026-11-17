@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Original rule of this project (not derived from other rule sets).
+rules:
+- id: custom_python_file-never-closed
+  languages:
+  - python
+  severity: INFO
+  message: |
+    A file is opened inside a function call and never closed explicitly (for example
+    `yaml.safe_dump(data, open("out.yaml", "w"))`). The file is only closed when Python happens to free the object,
+    so on some interpreters, or after an error, written data may not be flushed and the file handle stays open.
+
+    To remediate this issue, open the file in a `with` block so it is always closed:
+    `with open("out.yaml", "w") as f: yaml.safe_dump(data, f)`.
+  metadata:
+    cwe: "CWE-775"
+    category: "maintainability"
+    shortDescription: "Missing release of file descriptor or handle after effective lifetime"
+    security-severity: "Info"
+    confidence: "HIGH"
+    references:
+    - "https://cwe.mitre.org/data/definitions/775.html"
+  patterns:
+  - pattern: $F(..., open(...), ...)
+  - pattern-not: closing(open(...))
+  - pattern-not: contextlib.closing(open(...))
+  - pattern-not: $STACK.enter_context(open(...))
