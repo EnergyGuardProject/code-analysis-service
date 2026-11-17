@@ -1,21 +1,33 @@
-version: "3.8"
+# PRODUCTION stack. The dashboard reaches the backend as http://code_analysis_backend:5000 on this network, so keep
+# the container name, the network and the project name (the directory name) as they are.
+#
+# Image tags (same image name as the development stack, different tag):
+#   :prod             what runs in production (the default of this file)
+#   :dev              built from the working tree by docker-compose.dev.yml: the candidate to test
+#   :prod-YYYY-MM-DD  dated copies of earlier :prod images, for rolling back
+# Test the candidate with the dashboard:   TAG=dev docker compose up -d --no-build code-analysis-backend
+# Roll back:                               TAG=prod-2026-11-05 docker compose up -d --no-build code-analysis-backend
+# Keep the candidate:  docker tag <image>:prod <image>:prod-$(date +%F) && docker tag <image>:dev <image>:prod
+#                      && docker compose up -d --no-build code-analysis-backend
 
 networks:
   code-analysis-net:
     driver: bridge
 
 services:
-  backend:
+  code-analysis-backend:
     build: ./code-analysis-backend
+    image: energyguard-code-quality-code-analysis-backend:${TAG:-prod}
     container_name: code_analysis_backend
     restart: always
     ports:
-      - "9001:5000"
+      - "127.0.0.1:9001:5000"
     networks:
       - code-analysis-net
 
-  frontend:
+  code-analysis-frontend:
     build: ./code-analysis-frontend
+    image: energyguard-code-quality-code-analysis-frontend:${TAG:-prod}
     container_name: code-analysis-frontend
     restart: always
     ports:
@@ -27,6 +39,6 @@ services:
       - ./code-analysis-frontend:/app
     command: python manage.py runserver 0.0.0.0:9002
     depends_on:
-      - backend
+      - code-analysis-backend
     networks:
       - code-analysis-net

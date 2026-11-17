@@ -1,0 +1,43 @@
+# DEVELOPMENT stack: a separate project, containers, network, ports and images from production
+# (docker-compose.yml), so both can run at the same time and nothing here touches the live service.
+#
+#   docker compose -f docker-compose.dev.yml up --build        # backend :9011, frontend :9012
+#   docker compose -f docker-compose.dev.yml down              # stop and remove the dev stack
+#
+# The images are tagged :dev (production uses :prod of the same names). The code is mounted into the containers: changes to the backend (`app.py`, `rules/`) and to the frontend are picked
+# up without rebuilding (the backend reloads itself, and rules are read again on every scan).
+name: code-analysis-dev
+
+networks:
+  dev-net:
+    driver: bridge
+
+services:
+  code-analysis-backend:
+    build: ./code-analysis-backend
+    image: energyguard-code-quality-code-analysis-backend:dev
+    container_name: code_analysis_backend_dev
+    ports:
+      - "127.0.0.1:9011:5000"
+    volumes:
+      - ./code-analysis-backend:/app
+    command: uvicorn app:app --host 0.0.0.0 --port 5000 --reload
+    networks:
+      - dev-net
+
+  code-analysis-frontend:
+    build: ./code-analysis-frontend
+    image: energyguard-code-quality-code-analysis-frontend:dev
+    container_name: code_analysis_frontend_dev
+    ports:
+      - "127.0.0.1:9012:9002"
+    environment:
+      - SCAN_API_URL=http://code_analysis_backend_dev:5000
+      - SCAN_API_TIMEOUT=${SCAN_API_TIMEOUT:-300}
+    volumes:
+      - ./code-analysis-frontend:/app
+    command: python manage.py runserver 0.0.0.0:9002
+    depends_on:
+      - code-analysis-backend
+    networks:
+      - dev-net
