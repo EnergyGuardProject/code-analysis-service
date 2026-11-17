@@ -1,6 +1,4 @@
 
-# admin_user_token: squ_d52d173b80d8920fa2195d94539368fdc3b1ff4a
-# admin_global_token: sqa_dfbe04563ba70fca4891c65e96b6d9acc1e8ca65
 
 services:
   code_analysis_backend:
